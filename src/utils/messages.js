@@ -8,11 +8,6 @@ const messages = {
         unauthorized: 'Không có quyền truy cập',
         loginError: 'Lỗi đăng nhập'
     },
-    user: {
-        createSuccess: 'Tạo người dùng thành công',
-        notFound: 'Người dùng không tồn tại',
-        alreadyExists: 'Email đã được đăng ký',
-    },
     common: {
         serverError: 'Đã xảy ra lỗi máy chủ',
         validationError: 'Dữ liệu không hợp lệ',

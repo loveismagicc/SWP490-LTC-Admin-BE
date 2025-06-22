@@ -1,20 +1,11 @@
-const express = require('express');
-const { body } = require('express-validator');
-const userController = require('../controllers/user.controller');
-const validateRequest = require('../middlewares/validateRequest');
-
+const express = require("express");
 const router = express.Router();
+const userController = require("../controllers/user.controller");
 
-router.get('/', userController.getAllUsers);
-
-router.post(
-  '/',
-  [
-    body('name').notEmpty().withMessage('Tên không được để trống'),
-    body('email').isEmail().withMessage('Email không hợp lệ'),
-    validateRequest,
-  ],
-  userController.createUser
-);
+router.get("/", userController.getUsers);
+router.get("/:id", userController.getUserById);
+router.post("/", userController.createUser);
+router.post("/:id", userController.updateUser);
+router.delete("/:id", userController.deleteUser);
 
 module.exports = router;
