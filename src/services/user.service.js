@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const bcrypt = require('bcryptjs');
 
 exports.getUsers = async (page, limit, search) => {
     const skip = (page - 1) * limit;
@@ -48,9 +49,13 @@ exports.updateUser = async (id, data) => {
         throw error;
     }
 
-    user.username = data.username;
     user.email = data.email;
     user.role = data.role;
+
+    if (data.password && data.password.trim() !== '') {
+        user.password = data.password;
+    }
+
     return await user.save();
 };
 

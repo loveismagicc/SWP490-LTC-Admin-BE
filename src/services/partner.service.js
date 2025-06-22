@@ -1,5 +1,7 @@
 const Partner = require("../models/Partner");
+const User = require("../models/User");
 const {sendMail} = require("../utils/mailer");
+const checkTaxCode = require("../utils/checkTaxCode");
 
 exports.registerPartner = async (data) => {
     const {
@@ -25,6 +27,13 @@ exports.registerPartner = async (data) => {
         error.statusCode = 400;
         throw error;
     }
+
+    // const tax = await checkTaxCode(data.taxId);
+    // if(!tax.success) {
+    //     const error = new Error("Mã số thuế không tồn tại");
+    //     error.statusCode = 400;
+    //     throw error;
+    // }
 
     // Nếu licenseFile được truyền (từ multer)
     const fileData = licenseFile ? {
@@ -107,6 +116,44 @@ exports.registerPartner = async (data) => {
         console.error("Gửi email thất bại:", mailErr);
     }
 
+    try {
+        await sendMail({
+            to: data.email,
+            subject: "🎉 Đăng ký đối tác thành công - Đang chờ xét duyệt",
+            html: `
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+      <h2 style="color: #2c3e50;">🤝 Cảm ơn bạn đã đăng ký trở thành đối tác của chúng tôi!</h2>
+
+      <p>Xin chào <strong>${data.contactName}</strong>,</p>
+
+      <p>Chúng tôi đã nhận được thông tin đăng ký đối tác từ công ty <strong>${data.companyName}</strong>.</p>
+
+      <p>Đội ngũ quản trị viên sẽ xem xét hồ sơ và phản hồi trong thời gian sớm nhất.</p>
+
+      <hr style="margin: 20px 0;" />
+
+      <h3>📄 Thông tin đã đăng ký:</h3>
+      <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+        <tr><td style="padding: 8px; font-weight: bold;">Tên công ty:</td><td>${data.companyName}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Mã số thuế:</td><td>${data.taxId}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Người liên hệ:</td><td>${data.contactName}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Email:</td><td>${data.email}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Số điện thoại:</td><td>${data.phone}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Loại hình kinh doanh:</td><td>${data.businessType}</td></tr>
+      </table>
+
+      <p style="margin-top: 20px;">
+        📬 Mọi thắc mắc, vui lòng phản hồi email này hoặc liên hệ trực tiếp với đội ngũ hỗ trợ.
+      </p>
+
+      <p style="margin-top: 30px;">Trân trọng,<br/><strong>Đội ngũ quản trị hệ thống</strong></p>
+    </div>
+  `,
+        });
+    } catch (mailErr) {
+        console.error("Gửi email thất bại:", mailErr);
+    }
+
     return {
         message: "Đăng ký thành công. Đang chờ xét duyệt.", partner: {
             id: newPartner._id, companyName: newPartner.companyName, email: newPartner.email, status: newPartner.status,
@@ -114,20 +161,128 @@ exports.registerPartner = async (data) => {
     };
 };
 
-exports.confirmPartner = async (partnerId) => {
-    const partner = await Partner.findById(partnerId);
+
+exports.getPartners = async (page, limit, search) => {
+    const skip = (page - 1) * limit;
+    const query = search
+        ? {
+            $or: [
+                { email: { $regex: search, $options: "i" } },
+                { companyName: { $regex: search, $options: "i" } },
+                { phone: { $regex: search, $options: "i" } },
+            ],
+        }
+        : {};
+
+    const [total, rawData] = await Promise.all([
+        Partner.countDocuments(query),
+        Partner.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(), // dùng lean để dễ chỉnh sửa object
+    ]);
+
+    // Xoá licenseFile.buffer nếu có
+    const data = rawData.map(partner => {
+        if (partner.licenseFile) {
+            delete partner.licenseFile;
+        }
+        return partner;
+    });
+
+    return { total, data };
+};
+
+exports.getPartnerById = async (id) => {
+    const partner = await Partner.findById(id);
     if (!partner) {
-        const error = new Error("Không tìm thấy đối tác.");
+        const error = new Error("Không tìm thấy người dùng.");
+        error.statusCode = 404;
+        throw error;
+    }
+    return partner;
+};
+
+exports.approvePartner = async (id) => {
+    const partner = await Partner.findById(id);
+    if (!partner) {
+        const error = new Error("Đối tác không tồn tại");
         error.statusCode = 404;
         throw error;
     }
 
-    if (partner.status === 'approved') {
-        return partner; // đã xác nhận rồi, không cần save lại
+    const allowedTypes = ['hotel_owner', 'tour_provider'];
+    if (!allowedTypes.includes(partner.businessType)) {
+        const error = new Error("Loại hình kinh doanh không hợp lệ để tạo tài khoản");
+        error.statusCode = 400;
+        throw error;
     }
 
-    partner.status = "approved";
+    partner.status = "active";
     await partner.save();
+
+    const existingUser = await User.findOne({ email: partner.email });
+    if (!existingUser) {
+        const randomPassword = Math.random().toString(36).slice(-8);
+        const newUser = new User({
+            email: partner.email,
+            password: randomPassword,
+            name: partner.contactName,
+            role: partner.businessType,
+            businessType: partner.businessType,
+        });
+        await newUser.save();
+
+        // Gửi mail thông tin đăng nhập
+        try {
+            await sendMail({
+                to: partner.email,
+                subject: "✅ Tài khoản Đối tác đã được phê duyệt",
+                html: `
+<div style="font-family: Arial, sans-serif; padding: 20px;">
+  <h2>🎉 Xin chúc mừng!</h2>
+  <p>Bạn đã trở thành đối tác chính thức với chúng tôi.</p>
+  <p>Dưới đây là thông tin tài khoản đăng nhập:</p>
+  <ul>
+    <li><strong>Email:</strong> ${partner.email}</li>
+    <li><strong>Mật khẩu:</strong> ${randomPassword}</li>
+  </ul>
+  <p>👉 Hãy đổi mật khẩu ngay sau khi đăng nhập để bảo mật.</p>
+  <p>🔗 Truy cập hệ thống tại: <a href="${process.env.PARTNER_PORTAL_URL || '#'}">${process.env.PARTNER_PORTAL_URL || 'Link hệ thống'}</a></p>
+</div>
+                `,
+            });
+        } catch (mailErr) {
+            console.error("Gửi mail tài khoản thất bại:", mailErr);
+        }
+    }
 
     return partner;
 };
+
+
+exports.rejectPartner = async (id) => {
+    const partner = await Partner.findById(id);
+    if (!partner || !["hotel_owner", "tour_provider"].includes(partner.businessType)) {
+        const error = new Error("Đối tác không hợp lệ hoặc không tồn tại");
+        error.statusCode = 404;
+        throw error;
+    }
+    partner.status = "banned";
+    await partner.save();
+    return partner;
+};
+
+exports.deactivatePartner = async (id) => {
+    const partner = await Partner.findById(id);
+    if (!partner || !["hotel_owner", "tour_provider"].includes(partner.businessType)) {
+        const error = new Error("Đối tác không hợp lệ hoặc không tồn tại");
+        error.statusCode = 404;
+        throw error;
+    }
+    partner.status = "pending";
+    await partner.save();
+    return partner;
+};
+

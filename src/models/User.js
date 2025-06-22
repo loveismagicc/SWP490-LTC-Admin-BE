@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema({
     default: 'customer',
     required: true
   },
-  name: { type: String, required: true },
+  name: { type: String, required: false },
   profile: {
     avatar: { type: String },
     address: { type: String },

@@ -5,8 +5,8 @@ const jwt = require("jsonwebtoken");
 exports.loginAdmin = async ({ email, password }) => {
     const user = await User.findOne({ email });
 
-    if (!user || user.role !== 'admin') {
-        const error = new Error('Sai tài khoản hoặc không phải admin');
+    if (!user || (user.role !== 'admin'  && user.role !== 'hotel_owner' && user.role !== 'tour_provider')) {
+        const error = new Error('Tài khoản không có quyền truy cập');
         error.statusCode = 401;
         throw error;
     }
@@ -41,13 +41,6 @@ exports.refreshAccessToken = async (refreshToken) => {
         throw error;
     }
 
-    const user = await User.findOne({ refreshToken });
-    if (!user) {
-        const error = new Error("Refresh token không hợp lệ");
-        error.statusCode = 403;
-        throw error;
-    }
-
     let payload;
     try {
         payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
@@ -57,7 +50,14 @@ exports.refreshAccessToken = async (refreshToken) => {
         throw error;
     }
 
-    // Tạo accessToken mới
+    const user = await User.findById(payload.id);
+    if (!user) {
+        const error = new Error("Không tìm thấy người dùng");
+        error.statusCode = 404;
+        throw error;
+    }
+
     const { accessToken } = generateTokens(user);
     return { accessToken };
 };
+

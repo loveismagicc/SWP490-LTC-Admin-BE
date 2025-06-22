@@ -19,7 +19,7 @@ const PartnerSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "approved", "rejected"],
+        enum: ["pending", "active", "rejected", "banned"],
         default: "pending",
     },
 }, { timestamps: true });

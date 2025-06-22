@@ -1,6 +1,7 @@
 const { successResponse, errorResponse } = require("../utils/baseResponse");
 const partnerService = require("../services/partner.service");
 const messages = require("../utils/messages");
+const userService = require("../services/user.service");
 
 exports.registerPartner = async (req, res) => {
     try {
@@ -22,23 +23,86 @@ exports.registerPartner = async (req, res) => {
     }
 };
 
+exports.getPartners = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const result = await partnerService.getPartners(+page, +limit, search);
+        return successResponse(res, "Lấy danh sách đối tác thành công!", result);
+    } catch (err) {
+        return errorResponse(res, err.message || messages.user.getUsersError, null, err.statusCode || 500);
+    }
+};
 
-exports.confirmPartner = async (req, res) => {
+exports.getPartnerById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const partner = await partnerService.getPartnerById(id);
+        return successResponse(res, "Lấy thông tin đối tác thành công!", partner);
+    } catch (err) {
+        return errorResponse(res, err.message || messages.user.getUserError, null, err.statusCode || 500);
+    }
+};
+
+
+exports.approvePartner = async (req, res) => {
     try {
         const partnerId = req.params.id;
 
-        const partner = await partnerService.confirmPartner(partnerId);
+        const updatedPartner = await partnerService.approvePartner(partnerId);
 
-        res.send(`
-            <div style="text-align:center; padding:40px; font-family:sans-serif">
-                <h2>🎉 Đối tác ${partner.companyName} đã được xác nhận thành công!</h2>
-                <a href="${process.env.ADMIN_DASHBOARD_URL}/partners" style="color:#2196F3">Quay về trang quản trị</a>
-            </div>
-        `);
-    } catch (error) {
-        if (error.statusCode === 404) {
-            return res.status(404).send(error.message);
-        }
-        res.status(500).send("Lỗi xác nhận đối tác.");
+        return successResponse(
+            res,
+            `Đối tác ${updatedPartner.companyName} đã được duyệt thành công!`,
+            updatedPartner
+        );
+    } catch (err) {
+        return errorResponse(
+            res,
+            err.message || "Lỗi khi duyệt đối tác.",
+            null,
+            err.statusCode || 500
+        );
+    }
+};
+
+exports.rejectPartner = async (req, res) => {
+    try {
+        const partnerId = req.params.id;
+
+        const updatedPartner = await partnerService.rejectPartner(partnerId);
+
+        return successResponse(
+            res,
+            `Đối tác ${updatedPartner.companyName} đã bị từ chối.`,
+            updatedPartner
+        );
+    } catch (err) {
+        return errorResponse(
+            res,
+            err.message || "Lỗi khi từ chối đối tác.",
+            null,
+            err.statusCode || 500
+        );
+    }
+};
+
+exports.deactivatePartner = async (req, res) => {
+    try {
+        const partnerId = req.params.id;
+
+        const updatedPartner = await partnerService.deactivatePartner(partnerId);
+
+        return successResponse(
+            res,
+            `Đối tác ${updatedPartner.companyName} đã bị tạm khóa.`,
+            updatedPartner
+        );
+    } catch (err) {
+        return errorResponse(
+            res,
+            err.message || "Lỗi khi tạm khóa đối tác.",
+            null,
+            err.statusCode || 500
+        );
     }
 };
