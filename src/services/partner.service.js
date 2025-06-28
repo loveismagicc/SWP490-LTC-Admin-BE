@@ -162,17 +162,27 @@ exports.registerPartner = async (data) => {
 };
 
 
-exports.getPartners = async (page, limit, search) => {
+exports.getPartners = async (page, limit, search, filters = {}) => {
     const skip = (page - 1) * limit;
-    const query = search
-        ? {
-            $or: [
-                { email: { $regex: search, $options: "i" } },
-                { companyName: { $regex: search, $options: "i" } },
-                { phone: { $regex: search, $options: "i" } },
-            ],
-        }
-        : {};
+    const query = {};
+
+    // Tìm kiếm chung
+    if (search) {
+        query.$or = [
+            { email: { $regex: search, $options: "i" } },
+            { companyName: { $regex: search, $options: "i" } },
+            { phone: { $regex: search, $options: "i" } },
+        ];
+    }
+
+    // Lọc theo filters từ FE (VD: filters.status = ['pending'], filters.businessType = ['hotel_owner'])
+    if (filters.status && filters.status.length > 0) {
+        query.status = { $in: filters.status };
+    }
+
+    if (filters.businessType && filters.businessType.length > 0) {
+        query.businessType = { $in: filters.businessType };
+    }
 
     const [total, rawData] = await Promise.all([
         Partner.countDocuments(query),
@@ -180,10 +190,9 @@ exports.getPartners = async (page, limit, search) => {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .lean(), // dùng lean để dễ chỉnh sửa object
+            .lean(),
     ]);
 
-    // Xoá licenseFile.buffer nếu có
     const data = rawData.map(partner => {
         if (partner.licenseFile) {
             delete partner.licenseFile;
@@ -193,6 +202,7 @@ exports.getPartners = async (page, limit, search) => {
 
     return { total, data };
 };
+
 
 exports.getPartnerById = async (id) => {
     const partner = await Partner.findById(id);
@@ -269,10 +279,46 @@ exports.rejectPartner = async (id) => {
         error.statusCode = 404;
         throw error;
     }
+
     partner.status = "banned";
     await partner.save();
+
+    try {
+        await sendMail({
+            to: partner.email,
+            subject: "❌ Yêu cầu đăng ký đối tác bị từ chối",
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2 style="color: #c0392b;">📛 Rất tiếc! Hồ sơ đăng ký đối tác của bạn đã bị từ chối.</h2>
+                    
+                    <p>Xin chào <strong>${partner.contactName}</strong>,</p>
+
+                    <p>Sau khi xem xét hồ sơ đăng ký của công ty <strong>${partner.companyName}</strong>, chúng tôi rất tiếc phải thông báo rằng yêu cầu đã không được chấp thuận.</p>
+
+                    <p>❗️ Bạn có thể kiểm tra lại thông tin đã cung cấp hoặc liên hệ với chúng tôi để biết thêm chi tiết.</p>
+
+                    <hr style="margin: 20px 0;" />
+
+                    <h3>📄 Thông tin đăng ký:</h3>
+                    <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+                        <tr><td style="padding: 8px; font-weight: bold;">Tên công ty:</td><td>${partner.companyName}</td></tr>
+                        <tr><td style="padding: 8px; font-weight: bold;">Mã số thuế:</td><td>${partner.taxId}</td></tr>
+                        <tr><td style="padding: 8px; font-weight: bold;">Người liên hệ:</td><td>${partner.contactName}</td></tr>
+                        <tr><td style="padding: 8px; font-weight: bold;">Email:</td><td>${partner.email}</td></tr>
+                        <tr><td style="padding: 8px; font-weight: bold;">Loại hình:</td><td>${partner.businessType}</td></tr>
+                    </table>
+
+                    <p style="margin-top: 30px;">Trân trọng,<br/><strong>Đội ngũ quản trị hệ thống</strong></p>
+                </div>
+            `
+        });
+    } catch (err) {
+        console.error("Gửi email từ chối thất bại:", err);
+    }
+
     return partner;
 };
+
 
 exports.deactivatePartner = async (id) => {
     const partner = await Partner.findById(id);
@@ -281,8 +327,92 @@ exports.deactivatePartner = async (id) => {
         error.statusCode = 404;
         throw error;
     }
+
+    // Cập nhật trạng thái đối tác
     partner.status = "pending";
     await partner.save();
+
+    // Xóa User tương ứng nếu tồn tại
+    const deletedUser = await User.findOneAndDelete({ email: partner.email });
+    if (deletedUser) {
+        console.log(`🔒 User ${deletedUser.email} đã bị xóa do đối tác bị deactivate.`);
+    }
+
     return partner;
 };
 
+exports.createPartnerByAdmin = async (data) => {
+    const {
+        companyName,
+        taxId,
+        email,
+        phone,
+        address,
+        website,
+        contactName,
+        contactPosition,
+        description,
+        businessType,
+        status = "active",
+    } = data;
+
+    const existing = await Partner.findOne({ $or: [{ email }, { taxId }] });
+    if (existing) {
+        const error = new Error("Email hoặc mã số thuế đã tồn tại");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const newPartner = new Partner({
+        companyName,
+        taxId,
+        email,
+        phone,
+        address,
+        website,
+        contactName,
+        contactPosition,
+        description,
+        businessType,
+        status,
+    });
+
+    await newPartner.save();
+
+    let userInfo = null;
+    if (status === "active") {
+        const existingUser = await User.findOne({ email });
+        if (!existingUser) {
+            const randomPassword = Math.random().toString(36).slice(-8);
+            const newUser = new User({
+                email,
+                password: randomPassword,
+                name: contactName,
+                role: businessType,
+                businessType,
+            });
+            await newUser.save();
+
+            userInfo = { email, password: randomPassword };
+
+            await sendMail({
+                to: email,
+                subject: "✅ Tài khoản Đối tác đã được tạo",
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2>🎉 Chào mừng bạn đến với hệ thống!</h2>
+                        <p>Thông tin đăng nhập của bạn:</p>
+                        <ul>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Mật khẩu:</strong> ${randomPassword}</li>
+                        </ul>
+                        <p>🔐 Hãy đổi mật khẩu ngay sau khi đăng nhập.</p>
+                        <p>🔗 Truy cập hệ thống tại: <a href="${process.env.PARTNER_PORTAL_URL || '#'}">${process.env.PARTNER_PORTAL_URL || 'Link hệ thống'}</a></p>
+                    </div>
+                `,
+            });
+        }
+    }
+
+    return { partner: newPartner, userInfo };
+};

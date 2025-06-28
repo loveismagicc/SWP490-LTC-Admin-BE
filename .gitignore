@@ -9,9 +9,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-## dotenv env files
-#.env
-#.env.*  # nếu có nhiều môi trường như .env.production
+# dotenv env files
+.env
+.env.*  # nếu có nhiều môi trường như .env.production
 
 # OS generated files
 .DS_Store
