@@ -26,17 +26,17 @@ exports.registerPartner = async (req, res) => {
 exports.getPartners = async (req, res) => {
     try {
         const { page = 1, limit = 10, search = "" } = req.query;
+
+        const getFilterArray = (key) => {
+            const raw = req.query[key] || req.query[`${key}[]`];
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === "string") return [raw];
+            return [];
+        };
+
         const filters = {
-            status: Array.isArray(req.query.status)
-                ? req.query.status
-                : req.query.status
-                    ? [req.query.status]
-                    : [],
-            businessType: Array.isArray(req.query.businessType)
-                ? req.query.businessType
-                : req.query.businessType
-                    ? [req.query.businessType]
-                    : [],
+            status: getFilterArray("status"),
+            businessType: getFilterArray("businessType"),
         };
 
         const result = await partnerService.getPartners(+page, +limit, search, filters);
@@ -126,5 +126,25 @@ exports.createPartnerByAdmin = async (req, res) => {
         return successResponse(res, "Tạo đối tác thành công!", result);
     } catch (err) {
         return errorResponse(res, err.message || "Lỗi khi tạo đối tác", null, err.statusCode || 500);
+    }
+};
+
+exports.deletePartner = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const deletedPartner = await partnerService.deletePartner(id);
+        return successResponse(
+            res,
+            `Đối tác ${deletedPartner.companyName} đã được xóa thành công!`,
+            deletedPartner
+        );
+    } catch (err) {
+        return errorResponse(
+            res,
+            err.message || "Lỗi khi xóa đối tác.",
+            null,
+            err.statusCode || 500
+        );
     }
 };

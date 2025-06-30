@@ -241,6 +241,7 @@ exports.approvePartner = async (id) => {
             name: partner.contactName,
             role: partner.businessType,
             businessType: partner.businessType,
+            status: 'active',
         });
         await newUser.save();
 
@@ -329,7 +330,7 @@ exports.deactivatePartner = async (id) => {
     }
 
     // Cập nhật trạng thái đối tác
-    partner.status = "pending";
+    partner.status = "deactivate";
     await partner.save();
 
     // Xóa User tương ứng nếu tồn tại
@@ -416,3 +417,14 @@ exports.createPartnerByAdmin = async (data) => {
 
     return { partner: newPartner, userInfo };
 };
+exports.deletePartner = async (id) => {
+    const partner = await Partner.findByIdAndDelete(id);
+    if (!partner) {
+        const error = new Error("Không tìm thấy đối tác để xóa.");
+        error.statusCode = 404;
+        throw error;
+    }
+    await User.findOneAndDelete({ email: partner.email });
+    return partner;
+};
+

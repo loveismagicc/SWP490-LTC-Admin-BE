@@ -1,25 +1,45 @@
 const User = require("../models/User");
 const bcrypt = require('bcryptjs');
 
-exports.getUsers = async (page, limit, search) => {
+exports.getUsers = async (page, limit, search, filters = {}) => {
     const skip = (page - 1) * limit;
-    const query = search
-        ? {
+
+    const andConditions = [];
+
+    if (search) {
+        andConditions.push({
             $or: [
                 { username: { $regex: search, $options: "i" } },
                 { email: { $regex: search, $options: "i" } },
                 { role: { $regex: search, $options: "i" } },
             ],
-        }
-        : {};
+        });
+    }
+
+    if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+        andConditions.push({
+            status: { $in: filters.status },
+        });
+    }
+
+    if (filters.role && Array.isArray(filters.role) && filters.role.length > 0) {
+        andConditions.push({
+            role: { $in: filters.role },
+        });
+    }
+
+    // Gộp query lại
+    const finalQuery = andConditions.length > 0 ? { $and: andConditions } : {};
 
     const [total, data] = await Promise.all([
-        User.countDocuments(query),
-        User.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        User.countDocuments(finalQuery),
+        User.find(finalQuery).sort({ createdAt: -1 }).skip(skip).limit(limit),
     ]);
 
     return { total, data };
 };
+
+
 
 exports.getUserById = async (id) => {
     const user = await User.findById(id);
@@ -67,4 +87,17 @@ exports.deleteUser = async (id) => {
         throw error;
     }
     await user.deleteOne();
+};
+
+
+exports.toggleActive = async (id, status) => {
+    const user = await User.findById(id);
+    if (!user) {
+        const error = new Error("Người dùng không tồn tại");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    user.status = status;
+    return await user.save();
 };

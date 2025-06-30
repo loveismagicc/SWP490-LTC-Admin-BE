@@ -4,6 +4,8 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const connectDB = require('./src/config/db');
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./src/config/swagger");
 
 dotenv.config();
 connectDB();
@@ -11,6 +13,7 @@ connectDB();
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const routesPath = path.join(__dirname, 'src', 'routes');
 fs.readdirSync(routesPath).forEach((file) => {
