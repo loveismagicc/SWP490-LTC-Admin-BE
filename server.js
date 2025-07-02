@@ -14,6 +14,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use(
+    cors({
+        origin: ["http://localhost:5173", "https://swp490-ltc-admin.onrender.com"],
+        credentials: true,
+    })
+);
 
 const routesPath = path.join(__dirname, 'src', 'routes');
 fs.readdirSync(routesPath).forEach((file) => {
