@@ -9,7 +9,9 @@ exports.getHotels = async (page, limit, search, filters) => {
         query.name = { $regex: search, $options: "i" };
     }
 
-    if (filters.status) query.status = filters.status;
+    if (filters.status && filters.status.length > 0) {
+        query.status = { $in: filters.status };
+    }
     if (filters.ownerId) query.ownerId = filters.ownerId;
     if (filters.address) query.address = { $regex: filters.address, $options: "i" };
 
@@ -57,4 +59,17 @@ exports.createHotel = async (hotelData) => {
         };
     }
 };
+exports.getHotelById = async (id) => {
+    const hotel = await Hotel.findById(id);
+
+    if (!hotel) {
+        throw {
+            message: "Không tìm thấy khách sạn",
+            statusCode: 404
+        };
+    }
+
+    return hotel;
+};
+
 

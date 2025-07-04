@@ -5,10 +5,15 @@ exports.getHotels = async (req, res) => {
     try {
         const { page = 1, limit = 10, search = "", status, ownerId, address } = req.query;
 
+        const getFilterArray = (key) => {
+            const raw = req.query[key] || req.query[`${key}[]`];
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === "string") return [raw];
+            return [];
+        };
+
         const filters = {
-            status,
-            ownerId,
-            address,
+            status: getFilterArray("status"),
         };
 
         const result = await hotelService.getHotels(+page, +limit, search, filters);
@@ -68,25 +73,25 @@ exports.createHotel = async (req, res) => {
         const {
             name,
             address,
-            city,
             rating,
+            location,
             description,
             status = "pending",
             images = []
         } = req.body;
 
-        if (!name || !address || !city || !ownerId) {
+        if (!name || !address) {
             return errorResponse(res, "Thiếu thông tin bắt buộc!", null, 400);
         }
 
         const result = await hotelService.createHotel({
             name,
             address,
-            city,
             rating: rating || 3,
             description: description || "",
             status,
-            images
+            images,
+            location
         });
 
         return successResponse(res, "Thêm khách sạn thành công!", result);
@@ -94,4 +99,20 @@ exports.createHotel = async (req, res) => {
         return errorResponse(res, err.message, null, err.statusCode || 500);
     }
 };
+
+exports.getHotelById = async (req, res) => {
+    try {
+        const hotelId = req.params.id;
+        const result = await hotelService.getHotelById(hotelId);
+
+        if (!result) {
+            return errorResponse(res, "Không tìm thấy khách sạn!", null, 404);
+        }
+
+        return successResponse(res, "Lấy thông tin khách sạn thành công!", result);
+    } catch (err) {
+        return errorResponse(res, err.message, null, err.statusCode || 500);
+    }
+};
+
 

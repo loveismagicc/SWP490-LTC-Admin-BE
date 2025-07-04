@@ -163,6 +163,9 @@ router.post("/", hotelController.createHotel);
 router.patch("/:id/images", hotelController.updateHotelImages);
 
 
+router.get("/:id", hotelController.getHotelById);
+
+
 
 
 module.exports = router;

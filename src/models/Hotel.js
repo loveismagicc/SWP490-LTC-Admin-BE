@@ -7,9 +7,9 @@ const HotelSchema = new Schema({
     address: { type: String, required: true },
     location: {
         type: { type: String, enum: ['Point'], default: 'Point' },
-        coordinates: { type: [Number], required: true } // [longitude, latitude]
+        coordinates: { type: [Number], required: true }
     },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    ownerId: { type: Schema.Types.ObjectId, ref: 'User' },
     images: [{ type: String }],
     amenities: [{ type: String }],
     rooms: [{ type: Schema.Types.ObjectId, ref: 'Room' }],
