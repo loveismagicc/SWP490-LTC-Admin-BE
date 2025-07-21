@@ -13,6 +13,8 @@ const RoomSchema = new Schema({
     description: { type: String },
     amenities: [{ type: String }],
     images: [{ type: String }],
+    maxPeople: { type: Number, default: 2 },
+    area: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now }
 });
 
