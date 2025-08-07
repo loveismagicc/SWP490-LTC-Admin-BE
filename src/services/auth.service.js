@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const generateTokens = require('../utils/generateToken');
 const jwt = require("jsonwebtoken");
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const {sendMail} = require("../utils/mailer");
 
 exports.loginAdmin = async ({ email, password }) => {
@@ -107,9 +107,8 @@ exports.resetPasswordWithToken = async (token, newPassword) => {
         throw error;
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    await user.save();
+    user.password = newPassword;
+    await user.save(); // pre('save') sẽ tự hash
 
     return { message: "Đặt lại mật khẩu thành công" };
 };
