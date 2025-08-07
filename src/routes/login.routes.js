@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { loginAdmin, refreshToken } = require('../controllers/auth.controller');
+const { loginAdmin, refreshToken, forgotPassword, resetPassword} = require('../controllers/auth.controller');
 const validateRequest = require('../middlewares/validateRequest');
 
 const router = express.Router();
@@ -73,5 +73,9 @@ router.post(
  *         description: Refresh token không hợp lệ hoặc đã hết hạn
  */
 router.post("/refresh-token", refreshToken);
+
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+
 
 module.exports = router;

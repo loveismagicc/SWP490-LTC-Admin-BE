@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const generateTokens = require('../utils/generateToken');
 const jwt = require("jsonwebtoken");
+const bcrypt = require('bcrypt');
+const {sendMail} = require("../utils/mailer");
 
 exports.loginAdmin = async ({ email, password }) => {
     const user = await User.findOne({ email });
@@ -60,5 +62,55 @@ exports.refreshAccessToken = async (refreshToken) => {
 
     const { accessToken } = generateTokens(user);
     return { accessToken };
+};
+
+exports.sendResetPasswordEmail = async (email) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        const error = new Error("Không tìm thấy người dùng với email này");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+    await sendMail({
+        to: user.email,
+        subject: 'Yêu cầu đặt lại mật khẩu',
+        html: `
+            <p>Xin chào ${user.name || "bạn"},</p>
+            <p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng nhấn vào liên kết bên dưới để đặt lại:</p>
+            <a href="${resetLink}">${resetLink}</a>
+            <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
+        `,
+    });
+
+    return { message: "Đã gửi email đặt lại mật khẩu" };
+};
+
+exports.resetPasswordWithToken = async (token, newPassword) => {
+    let payload;
+    try {
+        payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+        const error = new Error("Token không hợp lệ hoặc đã hết hạn");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const user = await User.findById(payload.id);
+    if (!user) {
+        const error = new Error("Người dùng không tồn tại");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    return { message: "Đặt lại mật khẩu thành công" };
 };
 

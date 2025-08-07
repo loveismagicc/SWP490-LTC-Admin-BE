@@ -20,3 +20,22 @@ exports.refreshToken = async (req, res) => {
         return errorResponse(res, err.message || "Làm mới token thất bại", null, err.statusCode || 500);
     }
 };
+
+exports.forgotPassword = async (req, res) => {
+    try {
+        const result = await authService.sendResetPasswordEmail(req.body.email);
+        return successResponse(res, "Gửi email khôi phục thành công", result);
+    } catch (err) {
+        return errorResponse(res, err.message || "Gửi email thất bại", null, err.statusCode || 500);
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        const result = await authService.resetPasswordWithToken(token, newPassword);
+        return successResponse(res, "Đặt lại mật khẩu thành công", result);
+    } catch (err) {
+        return errorResponse(res, err.message || "Đặt lại mật khẩu thất bại", null, err.statusCode || 500);
+    }
+};
