@@ -63,3 +63,28 @@ exports.getRoomById = async (id) => {
     if (!room) throw new Error("Không tìm thấy phòng");
     return room;
 };
+
+exports.createRoom = async (data) => {
+    // Kiểm tra hotel có tồn tại
+    const hotel = await Hotel.findById(data.hotelId);
+    if (!hotel) throw new Error("Không tìm thấy khách sạn");
+
+    const room = new Room(data);
+    await room.save();
+    return room;
+};
+
+exports.updateRoom = async (id, data) => {
+    const room = await Room.findById(id);
+    if (!room) throw new Error("Không tìm thấy phòng");
+
+    Object.assign(room, data); // gán dữ liệu mới
+    await room.save();
+    return room;
+};
+
+exports.deleteRoom = async (id) => {
+    const room = await Room.findByIdAndDelete(id);
+    if (!room) throw new Error("Không tìm thấy phòng");
+    return room;
+};
