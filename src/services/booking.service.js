@@ -1,4 +1,6 @@
+const moment = require( "moment/moment" );
 const Booking = require("../models/Booking");
+const User = require( "../models/User" );
 
 // 🟢 Tạo booking mới
 exports.createBooking = async (data) => {
@@ -14,8 +16,8 @@ exports.getBookings = async ({ page = 1, limit = 10, search = "", filters = {} }
     if (search) {
         query.$or = [
             { "paymentInfo.bookingCode": { $regex: search, $options: "i" } },
-            { "userId.name": { $regex: search, $options: "i" } },
-            { "userId.email": { $regex: search, $options: "i" } },
+            // { "userId.name": { $regex: search, $options: "i" } },
+            // { "userId.email": { $regex: search, $options: "i" } },
         ];
     }
 
@@ -23,9 +25,21 @@ exports.getBookings = async ({ page = 1, limit = 10, search = "", filters = {} }
     if (filters.status && filters.status !== "") {
         query.status = filters.status;
     }
+	if(filters.fromDate && filters.toDate){
+		let fromDate = moment(filters.fromDate).startOf('day').format('yyyy-MM-DD HH:mm:ss');
+		let toDate = moment(filters.toDate).endOf('day').format('yyyy-MM-DD HH:mm:ss');
+		query.createdAt = {
+					$gte: fromDate,
+					$lte: toDate
+		};
+	}
 
     if (filters.customerName && filters.customerName !== "") {
-        query["userId.name"] = { $regex: filters.customerName, $options: "i" };
+		let userIds = await User.find(
+			{ name: { $regex: filters.customerName, $options: "i" } })
+			.select("_id");
+
+        query["userId"] = { $in: userIds};
     }
 
     if (filters.paymentMethod && filters.paymentMethod !== "") {

@@ -12,16 +12,23 @@ exports.createBooking = async (req, res) => {
 
 exports.getBookings = async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = "", filters = "{}" } = req.query;
+        let { page = 1, limit = 10, 
+			search = "", filters = "{}", 
+			customerName= null, status= null, fromDate, toDate } = req.query;
 
         page = +page;
         limit = +limit;
 
-        let parsedFilters = {};
+        let parsedFilters = {
+			customerName: customerName, 
+			status: status,
+			fromDate: fromDate,
+			toDate: toDate
+		};
         try {
-            parsedFilters = JSON.parse(filters);
+            parsedFilters = {...JSON.parse(filters), ...parsedFilters};
         } catch {
-            parsedFilters = {};
+            parsedFilters = {...parsedFilters};
         }
 
         const result = await bookingService.getBookings({

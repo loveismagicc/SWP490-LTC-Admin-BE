@@ -6,7 +6,6 @@ const messages = require('../utils/messages');
 
 exports.protectAdmin = async (req, res, next) => {
     let token;
-
     try {
         if (
             req.headers.authorization &&

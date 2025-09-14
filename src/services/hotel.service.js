@@ -61,7 +61,7 @@ exports.createHotel = async (hotelData) => {
 };
 exports.getHotelById = async (id) => {
     const hotel = await Hotel.findById(id);
-
+	console.log("id, hotel", id, hotel);
     if (!hotel) {
         throw {
             message: "Không tìm thấy khách sạn",

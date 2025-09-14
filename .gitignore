@@ -41,3 +41,10 @@ test-output/
 
 # Optional yarn cache
 .yarn/
+
+# Package lock files
+package-lock.json
+
+# Debugger files
+.vscode/
+.idea/

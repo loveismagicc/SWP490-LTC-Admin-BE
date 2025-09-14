@@ -1,5 +1,6 @@
 const Room = require("../models/Room");
 const Hotel = require("../models/Hotel");
+const { default: mongoose } = require( "mongoose" );
 
 exports.getRooms = async (page, limit, search, filters) => {
     const skip = (page - 1) * limit;
@@ -22,9 +23,11 @@ exports.getRooms = async (page, limit, search, filters) => {
             hotelQuery.address = { $regex: filters.city, $options: "i" };
         }
 
-        const hotels = await Hotel.find(hotelQuery).select("_id");
+        const hotels = await Hotel
+		.find(hotelQuery).select("_id");
         const hotelIds = hotels.map(h => h._id);
         query.hotelId = { $in: hotelIds };
+		console.log("query", query);
     }
 
     const [data, total] = await Promise.all([
@@ -35,14 +38,18 @@ exports.getRooms = async (page, limit, search, filters) => {
     // Gán thêm tên khách sạn vào mỗi phòng
     const hotelMap = {};
     if (data.length) {
-        const hotelIds = data.map(room => room.hotelId);
-        const hotelDocs = await Hotel.find({ _id: { $in: hotelIds } }).select("name");
+        const hotelIds = data.map(room => room.hotelId || room.hotel_id)?.map(id =>
+			typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id
+		);
+
+        const hotelDocs = await Hotel.
+		find({ _id: { $in: hotelIds } }).select("name");
         hotelDocs.forEach(hotel => {
             hotelMap[hotel._id.toString()] = hotel.name;
         });
 
         data.forEach(room => {
-            room.hotelName = hotelMap[room.hotelId.toString()];
+            room.hotelName = hotelMap[(room.hotelId || room.hotel_id)?.toString()] || "N/A";
         });
     }
 
@@ -59,16 +66,18 @@ exports.toggleVisibility = async (roomId) => {
 };
 
 exports.getRoomById = async (id) => {
-    const room = await Room.findById(id).populate("hotelId"); // ✅ populate đúng tên field
+    const room = await Room.findById(id)
+	.populate("hotelId"); // ✅ populate đúng tên field
     if (!room) throw new Error("Không tìm thấy phòng");
+	
+
     return room;
 };
 
 exports.createRoom = async (data) => {
     // Kiểm tra hotel có tồn tại
-    const hotel = await Hotel.findById(data.hotelId);
+    const hotel = await Hotel.findById(data.hotel_id);
     if (!hotel) throw new Error("Không tìm thấy khách sạn");
-
     const room = new Room(data);
     await room.save();
     return room;
@@ -77,8 +86,10 @@ exports.createRoom = async (data) => {
 exports.updateRoom = async (id, data) => {
     const room = await Room.findById(id);
     if (!room) throw new Error("Không tìm thấy phòng");
-
+// Nếu có cập nhật hotelId, đảm bảo đúng kiểu ObjectId
+    
     Object.assign(room, data); // gán dữ liệu mới
+	
     await room.save();
     return room;
 };

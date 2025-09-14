@@ -14,6 +14,8 @@ exports.getHotels = async (req, res) => {
 
         const filters = {
             status: getFilterArray("status"),
+            ownerId: ownerId || null,
+            address: address || null,
         };
 
         const result = await hotelService.getHotels(+page, +limit, search, filters);
@@ -104,7 +106,7 @@ exports.getHotelById = async (req, res) => {
     try {
         const hotelId = req.params.id;
         const result = await hotelService.getHotelById(hotelId);
-
+		console.log("result", result);
         if (!result) {
             return errorResponse(res, "Không tìm thấy khách sạn!", null, 404);
         }
