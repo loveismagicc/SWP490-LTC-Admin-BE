@@ -14,33 +14,34 @@ function buildDateRange(startDate, endDate) {
     return { start, nextDayStart };
 }
 
-exports.getRevenues = async (page = 1, limit = 10, search = "", filters = {}) => {
-    const skip = (page - 1) * limit;
+exports.getRevenues = async (filters) => {
+    const skip = ((filters?.page || 1) - 1) * (filters?.limit || 10);
     const query = {};
 
     // Search theo bookingCode
-    if (search && String(search).trim()) {
-        const s = String(search).trim();
+    if (filters?.search && String(filters?.search).trim()) {
+        const s = String(filters?.search).trim();
         query["paymentInfo.bookingCode"] = { $regex: s, $options: "i" };
     }
 
     // Lọc theo ngày tạo booking (tuỳ nhu cầu có thể đổi sang paidAt/checkout)
-    if (filters.startDate && filters.endDate) {
+    if (filters?.startDate && filters?.endDate) {
         const { start, nextDayStart } = buildDateRange(filters.startDate, filters.endDate);
         query.createdAt = { $gte: start, $lt: nextDayStart };
     }
 
     // Lọc theo trạng thái payout (ví dụ: ['paid', 'unpaid'])
-    if (Array.isArray(filters.status) && filters.status.length) {
+    if (Array.isArray(filters?.status) && filters?.status?.length) {
         query["paymentInfo.payoutStatus"] = { $in: filters.status };
     }
+	// query.status = {$in: ["approved", "completed"]}; // chỉ lấy booking đã duyệt và hoàn thành
 
     const [docs, total, sumAgg] = await Promise.all([
         Booking.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit)
-            .populate("hotelId", "name")
+            .limit(filters?.limit || 10)
+            .populate("hotelId")
             .populate("roomId", "roomType")
             .populate("userId", "name email")
             .lean(),
@@ -52,7 +53,7 @@ exports.getRevenues = async (page = 1, limit = 10, search = "", filters = {}) =>
     ]);
 
     const totalAmount = sumAgg?.[0]?.sum || 0;
-
+	console.log("doc--------> ", docs);
     const data = docs.map((b) => ({
         _id: b._id, // để FE dùng nếu cần
         bookingCode: b.paymentInfo?.bookingCode || "",
@@ -109,6 +110,10 @@ exports.exportExcel = async ({ startDate, endDate, status = [] } = {}) => {
         .populate("roomId", "roomType")
         .populate("userId", "name")
         .lean();
+
+	// if(docs?.length === 0) {
+	// 	throw new Error("Không có dữ liệu để xuất file");
+	// }
 
     // Tạo workbook và worksheet
     const workbook = new ExcelJS.Workbook();

@@ -87,13 +87,7 @@ exports.createHotel = async (req, res) => {
         }
 
         const result = await hotelService.createHotel({
-            name,
-            address,
-            rating: rating || 3,
-            description: description || "",
-            status,
-            images,
-            location
+            ...req.body
         });
 
         return successResponse(res, "Thêm khách sạn thành công!", result);
